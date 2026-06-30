@@ -21,3 +21,5 @@ cover.out
 # common credentials
 kubeconfig
 credentials.json
+
+/.claude
