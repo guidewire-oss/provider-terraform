@@ -213,7 +213,7 @@ func (l *recordingLogger) Info(msg string, keysAndValues ...any) {
 	l.kvs = append(l.kvs, keysAndValues)
 }
 
-// GWCP-107200: the provider no longer force-unlocks, so a takeover is the
+// the provider no longer force-unlocks, so a takeover is the
 // only thing that tells an operator a later state-lock failure belongs to a
 // dead owner (clearable by hand) rather than to a live one (never clearable).
 func TestAcquireLogsTakeover(t *testing.T) {

@@ -135,7 +135,7 @@ func TestGuardStolenRunsFn(t *testing.T) {
 }
 
 func TestGuardStolenSurfacesLockError(t *testing.T) {
-	// GWCP-107200: stealing a stale claim must not clear the state lock the
+	// stealing a stale claim must not clear the state lock the
 	// presumed-dead owner left behind. fn therefore runs straight into
 	// Terraform's lock error, and Guard must hand that error back so it
 	// reaches the Workspace's Synced condition instead of being swallowed.
