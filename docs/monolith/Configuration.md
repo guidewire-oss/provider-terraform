@@ -435,7 +435,22 @@ spec:
 When a Workspace's shard label changes while a `terraform apply` is still running on the old instance, a bare relabel is already safe by default (no destroy is triggered, and the Terraform state lock serializes any overlap) — this flag is **optional polish**, not a correctness requirement. Turning it on adds:
 
 1. **Noise suppression** — the incoming instance backs off quietly instead of repeatedly failing against the held state lock during the handover window.
-2. **Automated crash recovery** — if the old owner crashed mid-apply, the new owner automatically runs `terraform force-unlock` once the old claim goes stale, instead of requiring a manual runbook.
+2. **Faster handover after a crash** — if the old owner crashed mid-apply, the new owner may take the Workspace over as soon as the old claim goes stale, rather than waiting out a poll interval.
+
+> **The provider never runs `terraform force-unlock` for you.** If the old owner was killed mid-apply, its state lock outlives it and the new owner's `terraform apply` fails against that lock. This is deliberate: the lock means an apply was interrupted, so the state behind it is unknown — resources may exist that the state does not record, and applying over it can fail with already-exists errors or duplicate real infrastructure. A stale claim is also not proof the old process died; it proves only that its heartbeats stopped. Clearing the lock is a manual step: inspect the state, confirm the previous apply is genuinely gone, then run `terraform force-unlock <LOCK_ID>` yourself.
+>
+> To find such a Workspace, look for the lock error on its `Synced` condition and in its Kubernetes events — `kubectl describe workspace <name>` shows both. The same error reaches the provider's own logs only when it runs with debug logging (`-d` / `--debug`, which the example install manifests set); the full Terraform stderr, including the lock ID, additionally requires `enableTerraformCLILogging: true` on the Workspace.
+>
+> **Before clearing any lock, check for a takeover.** The provider logs one line whenever it steals a stale claim:
+>
+> ```
+> Took over a stale ownership claim from a presumed-dead owner; any Terraform
+> state lock it left behind must be cleared manually
+>   workspace=tenant-a claim-lease=crossplane-system/9f3c…  previous-holder=provider-terraform-shard-1-abc12
+>   holder=provider-terraform-shard-2-def34  stale-for=1m40s
+> ```
+>
+> A lock error **preceded by** this line for the same Workspace is an orphaned lock: the previous holder stopped heartbeating, and once you have confirmed that pod is really gone, clearing the lock is the right move. A lock error with **no** such line means a live instance still holds the lock legitimately — clearing it then risks corrupting state. This log line is emitted at info level, so it appears without `--debug`.
 
 ```yaml
     - --enable-ownership-claims
